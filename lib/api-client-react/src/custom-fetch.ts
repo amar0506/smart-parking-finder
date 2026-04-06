@@ -358,6 +358,14 @@ export async function customFetch<T = unknown>(
     }
   }
 
+  // Fallback: Read token from localStorage if not attached by getter
+  if (!headers.has("authorization") && typeof localStorage !== "undefined") {
+    const localToken = localStorage.getItem("parking_token");
+    if (localToken) {
+      headers.set("authorization", `Bearer ${localToken}`);
+    }
+  }
+
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });

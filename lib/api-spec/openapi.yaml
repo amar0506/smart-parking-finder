@@ -3,13 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Smart Parking Finder API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: slots
+    description: Parking slot operations
+  - name: bookings
+    description: Booking operations
+  - name: locations
+    description: Parking location operations
+  - name: admin
+    description: Admin management operations
 paths:
   /healthz:
     get:
@@ -24,6 +34,401 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /locations:
+    get:
+      operationId: getLocations
+      tags: [locations]
+      summary: List all parking locations
+      responses:
+        "200":
+          description: List of locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParkingLocation"
+
+  /slots:
+    get:
+      operationId: getSlots
+      tags: [slots]
+      summary: List all parking slots
+      parameters:
+        - in: query
+          name: locationId
+          schema:
+            type: ["integer", "null"]
+          required: false
+          description: Filter by location ID
+      responses:
+        "200":
+          description: List of parking slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParkingSlot"
+
+  /slots/{id}:
+    get:
+      operationId: getSlot
+      tags: [slots]
+      summary: Get a specific parking slot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Parking slot details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingSlot"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bookings:
+    get:
+      operationId: getBookings
+      tags: [bookings]
+      summary: List current user's bookings
+      responses:
+        "200":
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Create a booking for a parking slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingBody"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "400":
+          description: Slot not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bookings/{id}:
+    get:
+      operationId: getBooking
+      tags: [bookings]
+      summary: Get a specific booking
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: cancelBooking
+      tags: [bookings]
+      summary: Cancel a booking
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [slots]
+      summary: Get summary stats for the dashboard
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /admin/slots:
+    post:
+      operationId: adminCreateSlot
+      tags: [admin]
+      summary: Admin - Create a new parking slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminCreateSlotBody"
+      responses:
+        "201":
+          description: Slot created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingSlot"
+        "403":
+          description: Not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/slots/{id}:
+    patch:
+      operationId: adminUpdateSlot
+      tags: [admin]
+      summary: Admin - Update a parking slot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUpdateSlotBody"
+      responses:
+        "200":
+          description: Slot updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingSlot"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: adminDeleteSlot
+      tags: [admin]
+      summary: Admin - Delete a parking slot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Slot deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/bookings:
+    get:
+      operationId: adminGetBookings
+      tags: [admin]
+      summary: Admin - Get all bookings
+      responses:
+        "200":
+          description: All bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+        "403":
+          description: Not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/users:
+    get:
+      operationId: adminGetUsers
+      tags: [admin]
+      summary: Admin - Get all users
+      responses:
+        "200":
+          description: All users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "403":
+          description: Not admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +439,260 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        createdAt:
+          type: string
+      required:
+        - id
+        - email
+        - name
+        - role
+        - createdAt
+
+    RegisterBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        name:
+          type: string
+      required:
+        - email
+        - password
+        - name
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required:
+        - user
+        - token
+
+    ParkingLocation:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        totalSlots:
+          type: integer
+        availableSlots:
+          type: integer
+        imageUrl:
+          type: ["string", "null"]
+      required:
+        - id
+        - name
+        - address
+        - lat
+        - lng
+        - totalSlots
+        - availableSlots
+
+    ParkingSlot:
+      type: object
+      properties:
+        id:
+          type: integer
+        locationId:
+          type: integer
+        slotNumber:
+          type: string
+        floor:
+          type: string
+        type:
+          type: string
+          enum: [standard, handicap, electric, compact]
+        status:
+          type: string
+          enum: [available, booked, maintenance]
+        pricePerHour:
+          type: number
+        bookedBy:
+          type: ["string", "null"]
+        bookedUntil:
+          type: ["string", "null"]
+        locationName:
+          type: ["string", "null"]
+      required:
+        - id
+        - locationId
+        - slotNumber
+        - floor
+        - type
+        - status
+        - pricePerHour
+
+    CreateBookingBody:
+      type: object
+      properties:
+        slotId:
+          type: integer
+        hours:
+          type: integer
+        vehiclePlate:
+          type: string
+      required:
+        - slotId
+        - hours
+        - vehiclePlate
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        slotId:
+          type: integer
+        vehiclePlate:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        hours:
+          type: integer
+        totalCost:
+          type: number
+        status:
+          type: string
+          enum: [active, cancelled, completed]
+        createdAt:
+          type: string
+        slotNumber:
+          type: ["string", "null"]
+        floor:
+          type: ["string", "null"]
+        locationName:
+          type: ["string", "null"]
+        userEmail:
+          type: ["string", "null"]
+        userName:
+          type: ["string", "null"]
+      required:
+        - id
+        - userId
+        - slotId
+        - vehiclePlate
+        - startTime
+        - endTime
+        - hours
+        - totalCost
+        - status
+        - createdAt
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalSlots:
+          type: integer
+        availableSlots:
+          type: integer
+        bookedSlots:
+          type: integer
+        maintenanceSlots:
+          type: integer
+        totalLocations:
+          type: integer
+        activeBookings:
+          type: integer
+        todayRevenue:
+          type: number
+      required:
+        - totalSlots
+        - availableSlots
+        - bookedSlots
+        - maintenanceSlots
+        - totalLocations
+        - activeBookings
+        - todayRevenue
+
+    AdminCreateSlotBody:
+      type: object
+      properties:
+        locationId:
+          type: integer
+        slotNumber:
+          type: string
+        floor:
+          type: string
+        type:
+          type: string
+          enum: [standard, handicap, electric, compact]
+        pricePerHour:
+          type: number
+      required:
+        - locationId
+        - slotNumber
+        - floor
+        - type
+        - pricePerHour
+
+    AdminUpdateSlotBody:
+      type: object
+      properties:
+        slotNumber:
+          type: string
+        floor:
+          type: string
+        type:
+          type: string
+          enum: [standard, handicap, electric, compact]
+        status:
+          type: string
+          enum: [available, booked, maintenance]
+        pricePerHour:
+          type: number
