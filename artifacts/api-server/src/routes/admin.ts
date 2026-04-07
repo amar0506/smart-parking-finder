@@ -7,7 +7,7 @@ import { requireAdmin } from "./auth";
 const router: IRouter = Router();
 
 router.get("/admin/bookings", requireAdmin, async (_req, res): Promise<void> => {
-  const bookings = await db.select().from(bookingsTable);
+  const bookings = await db.select().from(bookingsTable).orderBy(bookingsTable.createdAt);
   const enriched = await Promise.all(bookings.map(async (booking) => {
     const [slot] = await db.select().from(parkingSlotsTable).where(eq(parkingSlotsTable.id, booking.slotId));
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, booking.userId));
@@ -26,28 +26,49 @@ router.get("/admin/bookings", requireAdmin, async (_req, res): Promise<void> => 
       locationName,
       userEmail: user?.email ?? null,
       userName: user?.name ?? null,
+      paymentStatus: booking.paymentStatus ?? "paid",
+      paymentRef: booking.paymentRef ?? null,
     };
   }));
   res.json(enriched);
 });
 
+// Admin cancel any booking
+router.delete("/admin/bookings/:id", requireAdmin, async (req: any, res): Promise<void> => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid booking id" });
+    return;
+  }
+
+  const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+  if (booking.status === "cancelled" || booking.status === "cancelled_by_admin") {
+    res.status(400).json({ error: "Booking already cancelled" });
+    return;
+  }
+
+  await db.update(bookingsTable).set({ status: "cancelled_by_admin" }).where(eq(bookingsTable.id, id));
+  await db.update(parkingSlotsTable).set({ status: "available", bookedBy: null, bookedUntil: null })
+    .where(eq(parkingSlotsTable.id, booking.slotId));
+
+  res.json({ message: "Booking cancelled by admin" });
+});
+
 router.get("/admin/users", requireAdmin, async (_req, res): Promise<void> => {
   const users = await db.select().from(usersTable);
   res.json(users.map(u => ({
-    id: u.id,
-    email: u.email,
-    name: u.name,
-    role: u.role,
+    id: u.id, email: u.email, name: u.name, role: u.role,
     createdAt: u.createdAt.toISOString(),
   })));
 });
 
 router.post("/admin/slots", requireAdmin, async (req, res): Promise<void> => {
   const parsed = AdminCreateSlotBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const [slot] = await db.insert(parkingSlotsTable).values({
     locationId: parsed.data.locationId,
@@ -59,27 +80,16 @@ router.post("/admin/slots", requireAdmin, async (req, res): Promise<void> => {
   }).returning();
 
   const [location] = await db.select().from(parkingLocationsTable).where(eq(parkingLocationsTable.id, slot.locationId));
-  res.status(201).json({
-    ...slot,
-    bookedBy: null,
-    bookedUntil: null,
-    locationName: location?.name ?? null,
-  });
+  res.status(201).json({ ...slot, bookedBy: null, bookedUntil: null, locationName: location?.name ?? null });
 });
 
 router.patch("/admin/slots/:id", requireAdmin, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = AdminUpdateSlotParams.safeParse({ id: rawId });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const parsed = AdminUpdateSlotBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const updateData: any = {};
   if (parsed.data.slotNumber !== undefined) updateData.slotNumber = parsed.data.slotNumber;
@@ -89,34 +99,19 @@ router.patch("/admin/slots/:id", requireAdmin, async (req, res): Promise<void> =
   if (parsed.data.pricePerHour !== undefined) updateData.pricePerHour = parsed.data.pricePerHour;
 
   const [slot] = await db.update(parkingSlotsTable).set(updateData).where(eq(parkingSlotsTable.id, params.data.id)).returning();
-  if (!slot) {
-    res.status(404).json({ error: "Slot not found" });
-    return;
-  }
+  if (!slot) { res.status(404).json({ error: "Slot not found" }); return; }
 
   const [location] = await db.select().from(parkingLocationsTable).where(eq(parkingLocationsTable.id, slot.locationId));
-  res.json({
-    ...slot,
-    bookedBy: slot.bookedBy ?? null,
-    bookedUntil: slot.bookedUntil ? slot.bookedUntil.toISOString() : null,
-    locationName: location?.name ?? null,
-  });
+  res.json({ ...slot, bookedBy: slot.bookedBy ?? null, bookedUntil: slot.bookedUntil?.toISOString() ?? null, locationName: location?.name ?? null });
 });
 
 router.delete("/admin/slots/:id", requireAdmin, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = AdminDeleteSlotParams.safeParse({ id: rawId });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const [slot] = await db.delete(parkingSlotsTable).where(eq(parkingSlotsTable.id, params.data.id)).returning();
-  if (!slot) {
-    res.status(404).json({ error: "Slot not found" });
-    return;
-  }
-
+  if (!slot) { res.status(404).json({ error: "Slot not found" }); return; }
   res.json({ message: "Slot deleted" });
 });
 

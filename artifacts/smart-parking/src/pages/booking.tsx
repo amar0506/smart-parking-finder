@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Clock, MapPin, Car, IndianRupee, Loader2, Info, CheckCircle2, QrCode, Smartphone } from "lucide-react";
+import { MapPin, Car, IndianRupee, Loader2, Info, CheckCircle2, QrCode, Smartphone, ShieldCheck } from "lucide-react";
 import { useGetSlot, getGetSlotQueryKey, useCreateBooking } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,33 +17,35 @@ import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 
-// Indian vehicle plate: e.g. MP19ZE7633 or MP 19 ZE 7633
-const INDIAN_PLATE_REGEX = /^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$/;
+// Strict Indian vehicle plate: e.g. MP19ZE7633 or DL01AA9999
+const PLATE_REGEX = /^[A-Z]{2}[0-9]{2}[A-Z]{1,3}[0-9]{4}$/;
 
 const formSchema = z.object({
   vehiclePlate: z
     .string()
-    .min(2, "Plate is required")
-    .transform(v => v.replace(/\s+/g, "").toUpperCase())
-    .refine(v => INDIAN_PLATE_REGEX.test(v), {
-      message: "Enter valid Indian plate (e.g. MP19ZE7633)",
+    .min(1, "Vehicle number is required")
+    .transform(v => v.replace(/[\s-]/g, "").toUpperCase())
+    .refine(v => PLATE_REGEX.test(v), {
+      message: "Enter a valid Indian vehicle number (e.g. MP19ZE7633)",
     }),
-  hours: z.number().min(1).max(24),
+  hours: z.number().min(1).max(12),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+const UPI_ID = "amar07@ptaxis";
 
 export default function Booking() {
   const { slotId } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showPayment, setShowPayment] = useState(false);
-  const [paymentDone, setPaymentDone] = useState(false);
+  const [paymentVerifying, setPaymentVerifying] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [pendingData, setPendingData] = useState<FormValues | null>(null);
 
   const parsedSlotId = slotId ? parseInt(slotId) : 0;
-
-  const { data: slot, isLoading: isSlotLoading } = useGetSlot(parsedSlotId, {
+  const { data: slot, isLoading } = useGetSlot(parsedSlotId, {
     query: { enabled: !!parsedSlotId, queryKey: getGetSlotQueryKey(parsedSlotId) }
   });
 
@@ -57,49 +59,61 @@ export default function Booking() {
   const hours = form.watch("hours");
   const totalCost = slot ? slot.pricePerHour * hours : 0;
 
-  const upiId = "satnaparking@upi";
   const upiString = slot
-    ? `upi://pay?pa=${upiId}&pn=SatnaSmartParking&am=${totalCost.toFixed(2)}&cu=INR&tn=ParkingSlot${slot.slotNumber}`
-    : "";
+    ? `upi://pay?pa=${UPI_ID}&pn=SatnaSmartParking&am=${totalCost.toFixed(2)}&cu=INR&tn=Slot${slot.slotNumber}Booking`
+    : `upi://pay?pa=${UPI_ID}&pn=SatnaSmartParking&cu=INR`;
 
   const onSubmit = (data: FormValues) => {
     setPendingData(data);
     setShowPayment(true);
+    setPaymentSuccess(false);
+    setPaymentVerifying(false);
   };
 
-  const handlePaymentConfirm = () => {
+  const handlePaymentDone = () => {
     if (!pendingData || !slot) return;
-    setPaymentDone(true);
+    setPaymentVerifying(true);
 
+    // Simulate payment verification (1.5s), then confirm booking
     setTimeout(() => {
-      createBooking.mutate({
-        data: {
-          slotId: slot.id,
-          hours: pendingData.hours,
-          vehiclePlate: pendingData.vehiclePlate,
-        }
-      }, {
-        onSuccess: () => {
-          toast({ title: "Booking Confirmed!", description: `Slot ${slot.slotNumber} booked. Payment of ₹${totalCost} received.` });
-          setShowPayment(false);
-          setLocation("/my-bookings");
-        },
-        onError: (err: any) => {
-          toast({
-            title: "Booking Failed",
-            description: err.message || err.data?.error || "Could not reserve the slot.",
-            variant: "destructive"
-          });
-          setShowPayment(false);
-          setPaymentDone(false);
-        }
-      });
-    }, 1500);
+      setPaymentVerifying(false);
+      setPaymentSuccess(true);
+
+      setTimeout(() => {
+        createBooking.mutate({
+          data: {
+            slotId: slot.id,
+            hours: pendingData.hours,
+            vehiclePlate: pendingData.vehiclePlate,
+          }
+        }, {
+          onSuccess: () => {
+            toast({
+              title: "Booking Confirmed!",
+              description: `Slot ${slot.slotNumber} booked. Payment of ₹${totalCost} received via UPI.`,
+            });
+            setShowPayment(false);
+            setLocation("/my-bookings");
+          },
+          onError: (err: any) => {
+            toast({
+              title: "Booking Failed",
+              description: err.message || err.data?.error || "Could not reserve the slot.",
+              variant: "destructive",
+            });
+            setShowPayment(false);
+            setPaymentSuccess(false);
+          }
+        });
+      }, 800);
+    }, 1600);
   };
 
-  if (isSlotLoading) {
-    return <div className="flex items-center justify-center min-h-[50vh]"><Loader2 className="animate-spin text-primary" size={32} /></div>;
-  }
+  if (isLoading) return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <Loader2 className="animate-spin text-primary" size={32} />
+    </div>
+  );
 
   if (!slot) return <div className="text-center py-12">Slot not found.</div>;
 
@@ -123,19 +137,17 @@ export default function Booking() {
           ← Back to Dashboard
         </Button>
         <h1 className="text-3xl font-bold tracking-tight">Reserve Parking</h1>
-        <p className="text-muted-foreground mt-1">Satna Smart City Parking · MP</p>
+        <p className="text-muted-foreground mt-1 text-sm">Satna Smart City Parking · Madhya Pradesh</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Slot Info */}
-        <Card className="bg-card">
-          <CardHeader>
-            <CardTitle>Slot Details</CardTitle>
-          </CardHeader>
+        <Card>
+          <CardHeader><CardTitle>Slot Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center text-primary">
-                <MapPin size={20} />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                <MapPin size={18} />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Location</p>
@@ -143,19 +155,19 @@ export default function Booking() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center text-primary">
-                <Car size={20} />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                <Car size={18} />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Slot</p>
                 <p className="font-medium">{slot.slotNumber}
-                  <Badge variant="outline" className="ml-2 text-xs">{slot.type}</Badge>
+                  <Badge variant="outline" className="ml-2 text-xs capitalize">{slot.type}</Badge>
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center text-primary">
-                <IndianRupee size={20} />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                <IndianRupee size={18} />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Rate</p>
@@ -163,29 +175,27 @@ export default function Booking() {
               </div>
             </div>
 
-            {/* Car entry animation */}
-            <div className="relative h-20 bg-muted/20 rounded-lg border border-border overflow-hidden mt-2">
-              <div className="absolute inset-0 flex items-end justify-center pb-2">
-                <div className="w-full h-1.5 bg-yellow-500/30 absolute bottom-6 left-0 right-0 border-t border-yellow-500/20 border-dashed" />
-                <motion.div
-                  initial={{ x: -80 }}
-                  animate={{ x: 0 }}
-                  transition={{ type: "spring", stiffness: 60, damping: 15, delay: 0.3 }}
-                  className="text-green-400"
-                >
-                  <Car size={36} />
-                </motion.div>
-              </div>
-              <div className="absolute top-2 left-2 text-[10px] text-muted-foreground">Slot Preview</div>
+            {/* Animated car preview */}
+            <div className="relative h-20 bg-muted/20 rounded-lg border border-border overflow-hidden">
+              <div className="absolute bottom-5 left-0 right-0 h-1 bg-yellow-500/30 border-t border-dashed border-yellow-500/40" />
+              <motion.div
+                initial={{ x: -90, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 55, damping: 14, delay: 0.4 }}
+                className="absolute bottom-3 left-1/2 -translate-x-1/2 text-green-400"
+              >
+                <Car size={40} />
+              </motion.div>
+              <p className="absolute top-2 left-2 text-[10px] text-muted-foreground">Slot {slot.slotNumber} · {slot.floor}</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Booking Form */}
-        <Card className="bg-card">
+        <Card>
           <CardHeader>
-            <CardTitle>Booking Form</CardTitle>
-            <CardDescription>Enter your vehicle details</CardDescription>
+            <CardTitle>Book This Slot</CardTitle>
+            <CardDescription>Enter vehicle details and pay via UPI</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -200,11 +210,14 @@ export default function Booking() {
                         <Input
                           placeholder="MP19ZE7633"
                           {...field}
-                          className="uppercase font-mono tracking-widest text-lg h-12"
-                          onChange={e => field.onChange(e.target.value.replace(/\s+/g, "").toUpperCase())}
+                          className="uppercase font-mono tracking-widest text-lg h-12 text-center"
+                          maxLength={12}
+                          onChange={e => field.onChange(e.target.value.replace(/[\s-]/g, "").toUpperCase())}
                         />
                       </FormControl>
-                      <FormDescription className="text-xs">Indian format: MP19ZE7633</FormDescription>
+                      <FormDescription className="text-xs">
+                        Indian format only (e.g. MP19ZE7633, DL01AA9999)
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -216,42 +229,36 @@ export default function Booking() {
                   render={({ field }) => (
                     <FormItem>
                       <div className="flex justify-between items-center mb-3">
-                        <FormLabel>Duration</FormLabel>
-                        <span className="font-mono bg-muted px-2 py-1 rounded text-sm">{field.value} Hours</span>
+                        <FormLabel>Parking Duration</FormLabel>
+                        <span className="font-mono bg-muted px-2 py-1 rounded text-sm font-bold">{field.value} hr{field.value > 1 ? "s" : ""}</span>
                       </div>
                       <FormControl>
-                        <Slider
-                          min={1} max={12} step={1}
-                          value={[field.value]}
-                          onValueChange={(vals) => field.onChange(vals[0])}
-                        />
+                        <Slider min={1} max={12} step={1} value={[field.value]}
+                          onValueChange={(v) => field.onChange(v[0])} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <div className="bg-muted/40 p-4 rounded-lg border border-border">
+                <div className="bg-muted/40 p-4 rounded-xl border border-border">
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-muted-foreground">Rate</span>
-                    <span>₹{slot.pricePerHour.toFixed(0)} / hr</span>
+                    <span>₹{slot.pricePerHour.toFixed(0)}/hr</span>
                   </div>
                   <div className="flex justify-between text-sm mb-3">
                     <span className="text-muted-foreground">Duration</span>
                     <span>{hours} hrs</span>
                   </div>
                   <Separator className="mb-3" />
-                  <div className="flex justify-between font-bold text-lg">
+                  <div className="flex justify-between font-bold text-xl">
                     <span>Total</span>
                     <span className="text-primary">₹{totalCost.toFixed(0)}</span>
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full h-11" disabled={createBooking.isPending}>
-                  {createBooking.isPending
-                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    : <><QrCode size={16} className="mr-2" /> Pay with UPI</>
-                  }
+                <Button type="submit" className="w-full h-12 text-base" disabled={createBooking.isPending}>
+                  <QrCode size={18} className="mr-2" /> Pay ₹{totalCost.toFixed(0)} via UPI
                 </Button>
               </form>
             </Form>
@@ -260,69 +267,88 @@ export default function Booking() {
       </div>
 
       {/* UPI Payment Dialog */}
-      <Dialog open={showPayment} onOpenChange={(o) => { if (!o && !paymentDone) { setShowPayment(false); setPaymentDone(false); } }}>
+      <Dialog open={showPayment} onOpenChange={(o) => {
+        if (!o && !paymentVerifying && !paymentSuccess) setShowPayment(false);
+      }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Smartphone size={20} className="text-primary" /> UPI Payment
+              <Smartphone size={18} className="text-primary" /> UPI Payment
             </DialogTitle>
           </DialogHeader>
 
           <AnimatePresence mode="wait">
-            {!paymentDone ? (
-              <motion.div
-                key="qr"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-center gap-4 py-4"
-              >
-                <div className="bg-white p-4 rounded-xl shadow-inner">
+            {paymentVerifying ? (
+              <motion.div key="verifying" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="flex flex-col items-center gap-4 py-8">
+                <Loader2 size={40} className="animate-spin text-primary" />
+                <p className="font-semibold">Verifying Payment...</p>
+                <p className="text-xs text-muted-foreground">Please wait while we confirm your UPI transaction</p>
+              </motion.div>
+            ) : paymentSuccess ? (
+              <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center gap-4 py-8">
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200 }}
+                  className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
+                  <CheckCircle2 size={40} className="text-green-400" />
+                </motion.div>
+                <p className="font-bold text-lg text-green-400">Payment Successful!</p>
+                <p className="text-sm text-muted-foreground">Confirming your booking...</p>
+              </motion.div>
+            ) : (
+              <motion.div key="qr" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="flex flex-col items-center gap-4 py-2">
+
+                {/* QR Code */}
+                <div className="bg-white p-4 rounded-2xl shadow-lg">
                   <QRCodeSVG
-                    value={upiString || "upi://pay?pa=satnaparking@upi"}
-                    size={180}
+                    value={upiString}
+                    size={190}
                     level="H"
                     includeMargin={false}
+                    imageSettings={{
+                      src: "",
+                      height: 0,
+                      width: 0,
+                      excavate: false,
+                    }}
                   />
                 </div>
-                <div className="text-center space-y-1">
-                  <p className="font-semibold text-lg">₹{totalCost.toFixed(0)}</p>
-                  <p className="text-xs text-muted-foreground">UPI ID: <span className="font-mono text-foreground">{upiId}</span></p>
-                  <p className="text-xs text-muted-foreground">Slot: {slot.slotNumber} • {pendingData?.vehiclePlate}</p>
-                </div>
-                <div className="flex flex-col gap-2 w-full">
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted-foreground">
-                    {["PhonePe", "Google Pay", "Paytm"].map(app => (
-                      <div key={app} className="bg-muted/50 rounded-lg py-2 border border-border">
-                        {app}
-                      </div>
-                    ))}
+
+                {/* Payment details */}
+                <div className="w-full space-y-2">
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
+                    <span className="text-xs text-muted-foreground">UPI ID</span>
+                    <span className="font-mono text-sm font-bold">{UPI_ID}</span>
                   </div>
-                  <Button onClick={handlePaymentConfirm} className="w-full mt-2 bg-green-600 hover:bg-green-700">
-                    <CheckCircle2 size={16} className="mr-2" /> Payment Done
+                  <div className="flex justify-between items-center bg-primary/10 rounded-lg px-3 py-2 border border-primary/20">
+                    <span className="text-xs text-muted-foreground">Amount</span>
+                    <span className="font-bold text-lg text-primary">₹{totalCost.toFixed(0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-3 py-2">
+                    <span className="text-xs text-muted-foreground">For</span>
+                    <span className="text-xs font-medium">Slot {slot.slotNumber} · {pendingData?.vehiclePlate}</span>
+                  </div>
+                </div>
+
+                {/* UPI Apps */}
+                <div className="grid grid-cols-3 gap-2 w-full text-center text-xs text-muted-foreground">
+                  {["PhonePe", "Google Pay", "Paytm"].map(app => (
+                    <div key={app} className="bg-muted/40 rounded-lg py-2 px-1 border border-border">
+                      {app}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="w-full space-y-2">
+                  <Button onClick={handlePaymentDone} className="w-full bg-green-600 hover:bg-green-700">
+                    <ShieldCheck size={16} className="mr-2" /> Payment Done — Confirm Booking
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setShowPayment(false)} className="text-muted-foreground">
+                  <Button variant="ghost" size="sm" onClick={() => setShowPayment(false)} className="w-full text-muted-foreground">
                     Cancel
                   </Button>
                 </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center gap-4 py-8"
-              >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-                  className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center"
-                >
-                  <CheckCircle2 size={40} className="text-green-400" />
-                </motion.div>
-                <p className="font-bold text-lg">Processing Booking...</p>
-                <Loader2 className="animate-spin text-muted-foreground" size={20} />
               </motion.div>
             )}
           </AnimatePresence>

@@ -12,6 +12,8 @@ export const bookingsTable = pgTable("bookings", {
   hours: integer("hours").notNull(),
   totalCost: real("total_cost").notNull(),
   status: text("status").notNull().default("active"),
+  paymentStatus: text("payment_status").notNull().default("paid"),
+  paymentRef: text("payment_ref"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

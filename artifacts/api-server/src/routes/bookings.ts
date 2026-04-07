@@ -24,6 +24,8 @@ async function enrichBooking(booking: any) {
     locationName,
     userEmail: user?.email ?? null,
     userName: user?.name ?? null,
+    paymentStatus: booking.paymentStatus ?? "paid",
+    paymentRef: booking.paymentRef ?? null,
   };
 }
 
@@ -58,6 +60,9 @@ router.post("/bookings", requireAuth, async (req: any, res): Promise<void> => {
   const endTime = new Date(startTime.getTime() + hours * 60 * 60 * 1000);
   const totalCost = hours * slot.pricePerHour;
 
+  // Generate payment reference
+  const paymentRef = `UPI${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
   const [booking] = await db.insert(bookingsTable).values({
     userId,
     slotId,
@@ -67,6 +72,8 @@ router.post("/bookings", requireAuth, async (req: any, res): Promise<void> => {
     hours,
     totalCost,
     status: "active",
+    paymentStatus: "paid",
+    paymentRef,
   }).returning();
 
   await db.update(parkingSlotsTable).set({
@@ -117,7 +124,11 @@ router.delete("/bookings/:id", requireAuth, async (req: any, res): Promise<void>
     return;
   }
 
-  await db.update(bookingsTable).set({ status: "cancelled" }).where(eq(bookingsTable.id, params.data.id));
+  const cancelStatus = req.user.role === "admin" && booking.userId !== req.user.id
+    ? "cancelled_by_admin"
+    : "cancelled";
+
+  await db.update(bookingsTable).set({ status: cancelStatus }).where(eq(bookingsTable.id, params.data.id));
   await db.update(parkingSlotsTable).set({
     status: "available",
     bookedBy: null,

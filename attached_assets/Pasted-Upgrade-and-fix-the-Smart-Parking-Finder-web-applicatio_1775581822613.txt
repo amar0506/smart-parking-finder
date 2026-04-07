@@ -1,0 +1,103 @@
+Upgrade and fix the Smart Parking Finder web application. 
+Keep the current UI design but implement the following improvements and fixes.
+
+1️⃣ Real UPI Payment Integration
+
+Replace the fake QR code with a real dynamic UPI QR.
+
+UPI ID:
+amar07@ptaxis
+
+Requirements:
+• Generate a real UPI payment QR code using this UPI ID.
+• Show the exact amount dynamically.
+• After the user clicks "Payment Done", verify payment simulation and then confirm booking.
+• Booking should only be confirmed AFTER payment success.
+• Save payment status in the database.
+• Show payment success notification.
+
+2️⃣ Fix 3D Parking View (Currently Blank)
+
+The 3D view currently becomes blank when clicked.
+
+Fix it and create a real 3D parking visualization using Three.js.
+
+Features:
+• 3D parking ground
+• 3D parking slots
+• 3D cars
+• When a slot is booked, animate a car entering the slot
+• Green = Available
+• Red = Booked
+• Yellow = Maintenance
+• Smooth camera orbit controls
+• Responsive for laptop and mobile
+
+3️⃣ Replace Fake Locations with Real Satna Locations
+
+Currently the map shows:
+
+• Downtown Parking Hub
+• Airport Terminal Garage
+• Mall Parking Complex
+
+Replace them with real Satna locations:
+
+• Satna Railway Station Parking
+• Satna Bus Stand Parking
+• City Mall Satna Parking
+
+Update:
+• Map markers
+• Location cards below the map
+• Parking slot counts
+• Address text
+
+4️⃣ Indian Vehicle Number Plate Validation
+
+Prevent fake vehicle numbers.
+
+Accept only valid Indian vehicle numbers using regex validation.
+
+Examples of valid formats:
+
+MP19ZE7633
+UP32AB1234
+DL01AA9999
+
+Rules:
+• If vehicle number format is invalid → booking should NOT proceed
+• Show error message "Enter a valid Indian vehicle number"
+• Store validated number in database
+
+5️⃣ Admin Full Booking Control
+
+Improve the Admin Panel.
+
+Admin should be able to:
+
+• View all bookings
+• See user email
+• See vehicle number
+• See slot booked
+• See payment status
+• Cancel any booking
+
+When admin cancels:
+• Slot should become AVAILABLE again
+• Booking history should update
+• User should see status "Cancelled by Admin"
+
+6️⃣ Improve System Reliability
+
+Also ensure:
+
+• No blank pages
+• No console errors
+• Proper API responses
+• Database consistency
+• Mobile responsive layout
+
+Do NOT remove existing functionality.
+
+Only upgrade and fix the system while keeping the UI modern and smooth.
