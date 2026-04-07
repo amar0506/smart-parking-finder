@@ -122,7 +122,7 @@ export default function MyBookings() {
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground mb-1">Total Cost</p>
-                            <p className="text-sm font-bold text-primary">${booking.totalCost.toFixed(2)}</p>
+                            <p className="text-sm font-bold text-primary">₹{booking.totalCost.toFixed(0)}</p>
                           </div>
                         </div>
                       </div>

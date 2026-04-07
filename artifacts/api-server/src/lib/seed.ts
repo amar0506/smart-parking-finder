@@ -1,11 +1,10 @@
 import bcrypt from "bcryptjs";
 import { db, usersTable, parkingLocationsTable, parkingSlotsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 
 export async function seedDemoData(): Promise<void> {
   try {
-    // Check if demo users already exist
     const [existingAdmin] = await db
       .select()
       .from(usersTable)
@@ -16,26 +15,46 @@ export async function seedDemoData(): Promise<void> {
       return;
     }
 
-    logger.info("Seeding demo data...");
+    logger.info("Seeding Satna Smart City demo data...");
 
-    // Create demo users
+    // Users
     const adminHash = await bcrypt.hash("admin123", 10);
     const userHash = await bcrypt.hash("user123", 10);
 
     await db.insert(usersTable).values([
       { email: "admin@parkingfinder.com", password: adminHash, name: "Admin User", role: "admin" },
-      { email: "john@example.com", password: userHash, name: "John Doe", role: "user" },
-      { email: "jane@example.com", password: userHash, name: "Jane Smith", role: "user" },
+      { email: "john@example.com",        password: userHash,  name: "Rahul Sharma",  role: "user" },
+      { email: "jane@example.com",        password: userHash,  name: "Priya Singh",   role: "user" },
     ]).onConflictDoNothing();
 
-    // Create parking locations
+    // Satna, MP parking locations
     await db.insert(parkingLocationsTable).values([
-      { name: "Downtown Parking Hub", address: "123 Main Street, City Center", lat: 40.7128, lng: -74.006, totalSlots: 30, availableSlots: 20 },
-      { name: "Airport Terminal Garage", address: "1 Airport Blvd, Terminal 2", lat: 40.6413, lng: -73.7781, totalSlots: 50, availableSlots: 35 },
-      { name: "Mall Parking Complex", address: "456 Shopping Ave, Westside", lat: 40.758, lng: -73.9855, totalSlots: 40, availableSlots: 28 },
+      {
+        name: "Railway Station Parking",
+        address: "Satna Railway Station, Station Road, Satna, MP 485001",
+        lat: 24.5640,
+        lng: 80.8348,
+        totalSlots: 30,
+        availableSlots: 20,
+      },
+      {
+        name: "City Mall Parking",
+        address: "Satna City Mall, Civil Lines, Satna, MP 485001",
+        lat: 24.5900,
+        lng: 80.8400,
+        totalSlots: 40,
+        availableSlots: 28,
+      },
+      {
+        name: "Bus Stand Parking",
+        address: "Satna Bus Stand, Bus Stand Road, Satna, MP 485001",
+        lat: 24.5712,
+        lng: 80.8297,
+        totalSlots: 20,
+        availableSlots: 12,
+      },
     ]).onConflictDoNothing();
 
-    // Get location IDs
     const locations = await db.select().from(parkingLocationsTable).orderBy(parkingLocationsTable.id);
 
     if (locations.length === 0) {
@@ -43,14 +62,12 @@ export async function seedDemoData(): Promise<void> {
       return;
     }
 
-    // Seed parking slots for each location
-    const floors = ["A", "B", "C"];
-    const types = ["standard", "standard", "standard", "standard", "standard", "standard", "standard", "standard", "compact", "electric"] as const;
-    const statusSets = [
-      ["available", "available", "booked", "available", "booked", "available", "available", "booked", "available", "available"],
-      ["available", "booked", "available", "available", "available", "booked", "available", "available", "available", "maintenance"],
-      ["booked", "available", "available", "booked", "available", "available", "available", "available", "booked", "available"],
-    ] as const;
+    // Slot config per location
+    const floors = ["Floor A", "Floor B", "Floor C"];
+    const types: Array<"standard" | "handicap" | "electric" | "compact"> =
+      ["standard", "standard", "standard", "standard", "standard", "standard", "standard", "compact", "electric", "handicap"];
+    const statusPattern: Array<"available" | "booked" | "maintenance"> =
+      ["available", "available", "booked", "available", "booked", "available", "available", "booked", "available", "available"];
 
     const slotRows: Array<{
       locationId: number;
@@ -62,15 +79,19 @@ export async function seedDemoData(): Promise<void> {
     }> = [];
 
     for (const location of locations) {
-      for (let f = 0; f < floors.length; f++) {
-        for (let s = 0; s < 10; s++) {
+      const floorsToUse = location.totalSlots <= 20 ? floors.slice(0, 2) : floors;
+      const slotsPerFloor = Math.ceil(location.totalSlots / floorsToUse.length);
+
+      for (let f = 0; f < floorsToUse.length; f++) {
+        for (let s = 0; s < Math.min(slotsPerFloor, 10); s++) {
           const type = types[s % types.length];
-          const status = statusSets[f][s % statusSets[f].length];
-          const price = type === "electric" ? 8.0 : type === "compact" ? 4.0 : 5.0;
+          const status = statusPattern[s % statusPattern.length];
+          // INR pricing
+          const price = type === "electric" ? 40 : type === "handicap" ? 15 : type === "compact" ? 20 : 25;
           slotRows.push({
             locationId: location.id,
-            slotNumber: `${floors[f]}-${String(s + 1).padStart(2, "0")}`,
-            floor: `Floor ${floors[f]}`,
+            slotNumber: `${String.fromCharCode(65 + f)}-${String(s + 1).padStart(2, "0")}`,
+            floor: floorsToUse[f],
             type,
             status,
             pricePerHour: price,
@@ -81,7 +102,7 @@ export async function seedDemoData(): Promise<void> {
 
     await db.insert(parkingSlotsTable).values(slotRows).onConflictDoNothing();
 
-    logger.info({ users: 3, locations: locations.length, slots: slotRows.length }, "Demo data seeded successfully");
+    logger.info({ users: 3, locations: locations.length, slots: slotRows.length }, "Satna demo data seeded");
   } catch (err) {
     logger.error({ err }, "Failed to seed demo data");
   }
