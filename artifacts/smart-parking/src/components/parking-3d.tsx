@@ -13,367 +13,416 @@ interface Parking3DProps {
   onSlotClick?: (slotId: number) => void;
 }
 
+const SLOT_W = 2.2;
+const SLOT_D = 3.8;
+const GAP = 0.4;
 const COLS = 10;
-const SLOT_W = 2.0;
-const SLOT_D = 3.5;
-const GAP = 0.35;
-const CAR_COLORS = [0x3355cc, 0xcc3322, 0x22aa44, 0xddaa22, 0x993399, 0x22aacc];
+const CAR_COLORS = [0x2255cc, 0xcc2211, 0x119944, 0xddbb22, 0x8833cc, 0x22aacc, 0xcc6622, 0x226644];
 
-function buildCar(colorHex: number): THREE.Group {
+function makeCar(color: number): THREE.Group {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.3, metalness: 0.6 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.5, roughness: 0.1 });
-  const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffff88, emissiveIntensity: 0.8 });
 
-  // Body
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.38, 2.2), mat);
-  body.position.y = 0.32;
-  body.castShadow = true;
-  g.add(body);
+  const body = new THREE.MeshStandardMaterial({ color, roughness: 0.25, metalness: 0.7 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x88bbff, transparent: true, opacity: 0.45, roughness: 0.1 });
+  const headlight = new THREE.MeshStandardMaterial({ color: 0xffffdd, emissive: 0xffffaa, emissiveIntensity: 1.0 });
+  const taillight = new THREE.MeshStandardMaterial({ color: 0xff2211, emissive: 0xff1100, emissiveIntensity: 0.7 });
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.95, roughness: 0.05 });
 
-  // Cabin
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 1.3), mat);
-  cabin.position.set(0, 0.65, -0.1);
+  // Lower body (wider)
+  const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.28, 2.3), body);
+  lowerBody.position.y = 0.24;
+  lowerBody.castShadow = true;
+  g.add(lowerBody);
+
+  // Upper body / cabin
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.32, 1.4), body);
+  cabin.position.set(0, 0.58, -0.06);
+  cabin.castShadow = true;
   g.add(cabin);
 
-  // Windshield
-  const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.26, 0.05), glassMat);
-  windshield.position.set(0, 0.66, 0.56);
-  windshield.rotation.x = -0.3;
-  g.add(windshield);
+  // Windshield front
+  const wsF = new THREE.Mesh(new THREE.PlaneGeometry(0.88, 0.28), glass);
+  wsF.position.set(0, 0.6, 0.56);
+  wsF.rotation.x = -0.35;
+  g.add(wsF);
+  // Windshield rear
+  const wsR = new THREE.Mesh(new THREE.PlaneGeometry(0.88, 0.25), glass);
+  wsR.position.set(0, 0.6, -0.76);
+  wsR.rotation.x = 0.35;
+  g.add(wsR);
 
   // Wheels
-  const wheelGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.15, 14);
-  [[-0.66, 0, 0.75], [0.66, 0, 0.75], [-0.66, 0, -0.75], [0.66, 0, -0.75]].forEach(([x, y, z], i) => {
-    const w = new THREE.Mesh(wheelGeo, darkMat);
+  const wheelGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.17, 16);
+  const hubGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.19, 8);
+  const wheelPos: [number, number, number][] = [
+    [-0.68, 0.22, 0.82], [0.68, 0.22, 0.82],
+    [-0.68, 0.22, -0.82], [0.68, 0.22, -0.82]
+  ];
+  wheelPos.forEach(([x, y, z], i) => {
+    const w = new THREE.Mesh(wheelGeo, dark);
     w.rotation.z = Math.PI / 2;
-    w.position.set(x, 0.2, z);
+    w.position.set(x, y, z);
     w.castShadow = true;
     g.add(w);
-    // Hub cap
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.16, 8), new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8 }));
+    const hub = new THREE.Mesh(hubGeo, chrome);
     hub.rotation.z = Math.PI / 2;
-    hub.position.set(x + (i % 2 === 0 ? -0.07 : 0.07), 0.2, z);
+    hub.position.set(x + (i % 2 === 0 ? -0.09 : 0.09), y, z);
     g.add(hub);
   });
 
   // Headlights
-  [[-0.4, 0.35, 1.11], [0.4, 0.35, 1.11]].forEach(([x, y, z]) => {
-    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.1, 0.04), lightMat);
+  [[-0.42, 0.3, 1.15], [0.42, 0.3, 1.15]].forEach(([x, y, z]) => {
+    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.1, 0.04), headlight);
     hl.position.set(x, y, z);
     g.add(hl);
   });
-
   // Taillights
-  [[-0.4, 0.35, -1.11], [0.4, 0.35, -1.11]].forEach(([x, y, z]) => {
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, 0.04), new THREE.MeshStandardMaterial({ color: 0xff2222, emissive: 0xff0000, emissiveIntensity: 0.5 }));
+  [[-0.42, 0.3, -1.15], [0.42, 0.3, -1.15]].forEach(([x, y, z]) => {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.09, 0.04), taillight);
     tl.position.set(x, y, z);
     g.add(tl);
   });
+
+  // Bumpers
+  const bumperF = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 0.08), chrome);
+  bumperF.position.set(0, 0.12, 1.17);
+  g.add(bumperF);
+  const bumperR = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 0.08), chrome);
+  bumperR.position.set(0, 0.12, -1.17);
+  g.add(bumperR);
 
   return g;
 }
 
 export default function Parking3D({ slots, onSlotClick }: Parking3DProps) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const stateRef = useRef<{
-    renderer: THREE.WebGLRenderer;
-    animId: number;
-    cleanup: () => void;
-  } | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+
     const container = mountRef.current;
     if (!container) return;
 
-    // Ensure container has real dimensions
-    const tryInit = () => {
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      if (w < 10 || h < 10) return false;
+    const init = (): (() => void) | null => {
+      const W = container.clientWidth;
+      const H = container.clientHeight;
+      if (W < 20 || H < 20) return null;
 
-      // ---- SCENE ----
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x080c1a);
-      scene.fog = new THREE.FogExp2(0x080c1a, 0.018);
-
-      const camera = new THREE.PerspectiveCamera(48, w / h, 0.1, 300);
-      camera.position.set(0, 22, 26);
-      camera.lookAt(0, 0, 0);
-
+      // ── Renderer ──
       const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(W, H);
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
       container.appendChild(renderer.domElement);
 
-      // ---- LIGHTS ----
-      scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-      const sun = new THREE.DirectionalLight(0xffffff, 0.9);
-      sun.position.set(15, 25, 15);
+      // ── Scene ──
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x060a18);
+      scene.fog = new THREE.FogExp2(0x060a18, 0.015);
+
+      // ── Camera ──
+      const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 400);
+
+      // Orbit state
+      let theta = Math.PI / 5;
+      let phi = Math.PI / 3.5;
+      let radius = 36;
+      const TARGET = new THREE.Vector3(0, 0, 0);
+      const MIN_RADIUS = 12, MAX_RADIUS = 80;
+      const MIN_PHI = 0.15, MAX_PHI = Math.PI / 2.1;
+
+      const syncCamera = () => {
+        camera.position.set(
+          TARGET.x + radius * Math.sin(phi) * Math.sin(theta),
+          TARGET.y + radius * Math.cos(phi),
+          TARGET.z + radius * Math.sin(phi) * Math.cos(theta),
+        );
+        camera.lookAt(TARGET);
+      };
+      syncCamera();
+
+      // ── Lights ──
+      scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+      const sun = new THREE.DirectionalLight(0xffeedd, 1.0);
+      sun.position.set(20, 35, 20);
       sun.castShadow = true;
-      sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
-      sun.shadow.camera.top = 30; sun.shadow.camera.bottom = -30;
-      sun.shadow.camera.far = 100;
-      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.mapSize.setScalar(2048);
+      sun.shadow.camera.near = 1;
+      sun.shadow.camera.far = 120;
+      sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
+      sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
       scene.add(sun);
-      const fill = new THREE.DirectionalLight(0x4488ff, 0.3);
-      fill.position.set(-10, 10, -10);
+
+      const fill = new THREE.DirectionalLight(0x4466ff, 0.35);
+      fill.position.set(-15, 15, -15);
       scene.add(fill);
 
-      // ---- GROUND ----
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(80, 80),
-        new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.95, metalness: 0.0 })
-      );
+      const hemi = new THREE.HemisphereLight(0x223366, 0x111111, 0.4);
+      scene.add(hemi);
+
+      // ── Ground ──
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0x0d1525, roughness: 0.92, metalness: 0.08 });
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), groundMat);
       ground.rotation.x = -Math.PI / 2;
-      ground.position.y = -0.02;
+      ground.position.y = -0.01;
       ground.receiveShadow = true;
       scene.add(ground);
 
       // Grid
-      const grid = new THREE.GridHelper(80, 40, 0x1e3a5f, 0x0f1f33);
-      grid.position.y = 0.005;
-      scene.add(grid);
+      scene.add(new THREE.GridHelper(120, 60, 0x1a3060, 0x0c1a38));
 
-      // ---- SLOTS ----
+      // ── Parking Slots ──
       const displaySlots = slots.slice(0, 30);
-      const slotMeshes: { mesh: THREE.Mesh; slotId: number; status: string }[] = [];
+      const clickableMeshes: THREE.Mesh[] = [];
+      const cars: Array<{ group: THREE.Group; targetZ: number; t: number; done: boolean }> = [];
 
       displaySlots.forEach((slot, i) => {
         const col = i % COLS;
         const row = Math.floor(i / COLS);
         const x = (col - COLS / 2 + 0.5) * (SLOT_W + GAP);
-        const z = row * (SLOT_D + GAP) - 4;
+        const z = row * (SLOT_D + GAP) - (Math.floor(displaySlots.length / COLS) / 2) * (SLOT_D + GAP);
 
         const isBooked = slot.status === "booked";
-        const isMaintenance = slot.status === "maintenance";
+        const isMaint = slot.status === "maintenance";
+        const edgeColor = isBooked ? 0xff3333 : isMaint ? 0xddaa00 : 0x22ff88;
+        const padColor = isBooked ? 0x300808 : isMaint ? 0x1a1a00 : 0x082808;
 
-        // Slot floor pad
-        const padColor = isBooked ? 0x3d0a0a : isMaintenance ? 0x2a2a10 : 0x0a2a10;
+        // Floor pad
         const pad = new THREE.Mesh(
-          new THREE.BoxGeometry(SLOT_W - 0.05, 0.04, SLOT_D - 0.05),
-          new THREE.MeshStandardMaterial({ color: padColor, roughness: 0.9 })
+          new THREE.BoxGeometry(SLOT_W - 0.08, 0.05, SLOT_D - 0.08),
+          new THREE.MeshStandardMaterial({ color: padColor, roughness: 0.95 })
         );
-        pad.position.set(x, 0.02, z);
+        pad.position.set(x, 0.025, z);
         pad.receiveShadow = true;
-        pad.userData = { slotId: slot.id, status: slot.status, clickable: slot.status === "available" };
+        pad.userData = { slotId: slot.id, status: slot.status };
         scene.add(pad);
-        slotMeshes.push({ mesh: pad, slotId: slot.id, status: slot.status });
+        if (slot.status === "available") clickableMeshes.push(pad);
 
-        // Slot border (edge lines)
+        // Edge highlight
         const edges = new THREE.LineSegments(
-          new THREE.EdgesGeometry(new THREE.BoxGeometry(SLOT_W, 0.08, SLOT_D)),
-          new THREE.LineBasicMaterial({
-            color: isBooked ? 0xff3333 : isMaintenance ? 0xddaa00 : 0x22ff77
-          })
+          new THREE.EdgesGeometry(new THREE.BoxGeometry(SLOT_W, 0.06, SLOT_D)),
+          new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 })
         );
-        edges.position.set(x, 0.04, z);
+        edges.position.set(x, 0.05, z);
         scene.add(edges);
 
-        // Status indicator sphere
-        const indicatorColor = isBooked ? 0xff3333 : isMaintenance ? 0xddaa00 : 0x22ff77;
-        const dot = new THREE.Mesh(
-          new THREE.SphereGeometry(0.12, 10, 10),
-          new THREE.MeshStandardMaterial({ color: indicatorColor, emissive: indicatorColor, emissiveIntensity: 0.6 })
-        );
-        dot.position.set(x - SLOT_W / 2 + 0.25, 0.4, z - SLOT_D / 2 + 0.25);
-        scene.add(dot);
+        // Status orb
+        const orbMat = new THREE.MeshStandardMaterial({ color: edgeColor, emissive: edgeColor, emissiveIntensity: 0.7 });
+        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), orbMat);
+        orb.position.set(x - SLOT_W / 2 + 0.22, 0.55, z - SLOT_D / 2 + 0.22);
+        orb.userData.isOrb = true;
+        orb.userData.baseX = x;
+        scene.add(orb);
 
         // Pillar
         const pillar = new THREE.Mesh(
-          new THREE.BoxGeometry(0.12, 1.0, 0.12),
-          new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.7, metalness: 0.5 })
+          new THREE.BoxGeometry(0.14, 1.1, 0.14),
+          new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.65, metalness: 0.55 })
         );
-        pillar.position.set(x - SLOT_W / 2 + 0.12, 0.5, z - SLOT_D / 2 + 0.12);
+        pillar.position.set(x - SLOT_W / 2 + 0.14, 0.55, z - SLOT_D / 2 + 0.14);
         pillar.castShadow = true;
         scene.add(pillar);
 
-        // Cars
+        // Point light for booked slots
         if (isBooked) {
-          const car = buildCar(CAR_COLORS[i % CAR_COLORS.length]);
-          car.position.set(x, 0, z);
-          // Store animation start offset
-          (car as any).__startZ = z - 10 - Math.random() * 5;
-          (car as any).__targetZ = z;
-          (car as any).__entered = false;
-          (car as any).__t = 0;
-          car.position.z = (car as any).__startZ;
+          const pl = new THREE.PointLight(0xff4422, 0.4, 4);
+          pl.position.set(x, 1.2, z);
+          scene.add(pl);
+        } else if (!isMaint) {
+          const pl = new THREE.PointLight(0x22ff66, 0.25, 4);
+          pl.position.set(x, 1.2, z);
+          scene.add(pl);
+        }
+
+        // Cars for booked slots
+        if (isBooked) {
+          const car = makeCar(CAR_COLORS[i % CAR_COLORS.length]);
+          const startZ = z - 12 - Math.random() * 4;
+          car.position.set(x, 0, startZ);
           car.castShadow = true;
           scene.add(car);
+          cars.push({ group: car, targetZ: z, t: Math.random() * 0.3, done: false });
         }
       });
 
-      // ---- MOUSE / ORBIT ----
+      // ── Orbit controls ──
       let isDragging = false;
-      let prevMouse = { x: 0, y: 0 };
-      let theta = Math.PI / 6;
-      let phi = Math.PI / 4;
-      const radius = 32;
-      let targetTheta = theta, targetPhi = phi;
+      let downPos = { x: 0, y: 0 };
+      let lastPos = { x: 0, y: 0 };
+      let tTarget = theta, pTarget = phi, rTarget = radius;
+      let autoTheta = theta;
 
-      const updateCamera = () => {
-        camera.position.x = radius * Math.sin(phi) * Math.sin(theta);
-        camera.position.y = radius * Math.cos(phi);
-        camera.position.z = radius * Math.sin(phi) * Math.cos(theta);
-        camera.lookAt(0, 0, 0);
-      };
-      updateCamera();
-
-      const onMouseDown = (e: MouseEvent) => {
+      const onPD = (e: PointerEvent) => {
         isDragging = true;
-        prevMouse = { x: e.clientX, y: e.clientY };
+        downPos = { x: e.clientX, y: e.clientY };
+        lastPos = { x: e.clientX, y: e.clientY };
+        container.setPointerCapture(e.pointerId);
       };
-      const onMouseMove = (e: MouseEvent) => {
+      const onPM = (e: PointerEvent) => {
         if (!isDragging) return;
-        const dx = (e.clientX - prevMouse.x) * 0.005;
-        const dy = (e.clientY - prevMouse.y) * 0.004;
-        targetTheta -= dx;
-        targetPhi = Math.max(0.2, Math.min(Math.PI / 2.2, targetPhi + dy));
-        prevMouse = { x: e.clientX, y: e.clientY };
+        tTarget -= (e.clientX - lastPos.x) * 0.006;
+        pTarget = Math.max(MIN_PHI, Math.min(MAX_PHI, pTarget + (e.clientY - lastPos.y) * 0.005));
+        lastPos = { x: e.clientX, y: e.clientY };
       };
-      const onMouseUp = () => { isDragging = false; };
+      const onPU = (e: PointerEvent) => {
+        const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+        isDragging = false;
+        autoTheta = tTarget; // continue auto-rotate from here
 
-      // Touch support
-      let lastTouch = { x: 0, y: 0 };
-      const onTouchStart = (e: TouchEvent) => {
-        isDragging = true;
-        lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      };
-      const onTouchMove = (e: TouchEvent) => {
-        if (!isDragging) return;
-        const dx = (e.touches[0].clientX - lastTouch.x) * 0.006;
-        const dy = (e.touches[0].clientY - lastTouch.y) * 0.004;
-        targetTheta -= dx;
-        targetPhi = Math.max(0.2, Math.min(Math.PI / 2.2, targetPhi + dy));
-        lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      };
-      const onTouchEnd = () => { isDragging = false; };
-
-      // Click for slot booking
-      const raycaster = new THREE.Raycaster();
-      const mouse2D = new THREE.Vector2();
-      let mouseDownPos = { x: 0, y: 0 };
-      const onPointerDown = (e: MouseEvent) => { mouseDownPos = { x: e.clientX, y: e.clientY }; };
-      const onPointerUp = (e: MouseEvent) => {
-        const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
-        if (dist > 5) return; // Was a drag
-        const rect = container.getBoundingClientRect();
-        mouse2D.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        mouse2D.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-        raycaster.setFromCamera(mouse2D, camera);
-        const meshes = slotMeshes.filter(s => s.status === "available").map(s => s.mesh);
-        const hits = raycaster.intersectObjects(meshes);
-        if (hits.length > 0 && onSlotClick) {
-          onSlotClick(hits[0].object.userData.slotId);
+        // Click detection — only if barely moved
+        if (moved < 6 && onSlotClick) {
+          const rect = container.getBoundingClientRect();
+          const m = new THREE.Vector2(
+            ((e.clientX - rect.left) / rect.width) * 2 - 1,
+            -((e.clientY - rect.top) / rect.height) * 2 + 1
+          );
+          const ray = new THREE.Raycaster();
+          ray.setFromCamera(m, camera);
+          const hits = ray.intersectObjects(clickableMeshes);
+          if (hits.length > 0) onSlotClick(hits[0].object.userData.slotId);
         }
       };
 
-      container.addEventListener("mousedown", onMouseDown);
-      container.addEventListener("mousedown", onPointerDown);
-      container.addEventListener("mousemove", onMouseMove);
-      container.addEventListener("mouseup", onMouseUp);
-      container.addEventListener("mouseup", onPointerUp);
-      container.addEventListener("touchstart", onTouchStart);
-      container.addEventListener("touchmove", onTouchMove);
-      container.addEventListener("touchend", onTouchEnd);
-      window.addEventListener("mouseup", onMouseUp);
+      // Scroll to zoom
+      const onWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        rTarget = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, rTarget + e.deltaY * 0.04));
+      };
 
-      // ---- ANIMATE ----
+      // Touch orbit
+      let lastTouchDist = 0;
+      const onTStart = (e: TouchEvent) => {
+        if (e.touches.length === 1) {
+          isDragging = true;
+          lastPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          downPos = { ...lastPos };
+        } else if (e.touches.length === 2) {
+          lastTouchDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+        }
+      };
+      const onTMove = (e: TouchEvent) => {
+        e.preventDefault();
+        if (e.touches.length === 1 && isDragging) {
+          tTarget -= (e.touches[0].clientX - lastPos.x) * 0.006;
+          pTarget = Math.max(MIN_PHI, Math.min(MAX_PHI, pTarget + (e.touches[0].clientY - lastPos.y) * 0.005));
+          lastPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else if (e.touches.length === 2) {
+          const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          rTarget = Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, rTarget - (dist - lastTouchDist) * 0.08));
+          lastTouchDist = dist;
+        }
+      };
+      const onTEnd = () => { isDragging = false; autoTheta = tTarget; };
+
+      container.addEventListener("pointerdown", onPD);
+      container.addEventListener("pointermove", onPM);
+      container.addEventListener("pointerup", onPU);
+      container.addEventListener("wheel", onWheel, { passive: false });
+      container.addEventListener("touchstart", onTStart, { passive: true });
+      container.addEventListener("touchmove", onTMove, { passive: false });
+      container.addEventListener("touchend", onTEnd);
+
+      // ── Animation loop ──
       let animId = 0;
-      let autoTheta = 0;
+      const clock = new THREE.Clock();
+
       const animate = () => {
         animId = requestAnimationFrame(animate);
+        const elapsed = clock.getElapsedTime();
 
-        // Auto rotate slowly when not dragging
+        // Auto-rotate when idle
         if (!isDragging) {
           autoTheta += 0.003;
-          targetTheta = autoTheta;
-        } else {
-          autoTheta = theta;
+          tTarget = autoTheta;
         }
 
-        theta += (targetTheta - theta) * 0.08;
-        phi += (targetPhi - phi) * 0.08;
-        updateCamera();
+        // Smooth interpolation
+        theta += (tTarget - theta) * 0.07;
+        phi += (pTarget - phi) * 0.07;
+        radius += (rTarget - radius) * 0.1;
 
-        // Animate cars entering
-        const t = Date.now() * 0.001;
+        syncCamera();
+
+        // Car entry animation
+        cars.forEach(entry => {
+          if (entry.done) return;
+          entry.t = Math.min(1, entry.t + 0.01);
+          const eased = 1 - (1 - entry.t) ** 3;
+          entry.group.position.z = entry.targetZ - 12 + 12 * eased;
+          if (entry.t >= 1) { entry.group.position.z = entry.targetZ; entry.done = true; }
+        });
+
+        // Pulse orbs
         scene.children.forEach(child => {
-          if ((child as any).__targetZ !== undefined) {
-            const car = child as any;
-            if (!car.__entered) {
-              car.__t = Math.min(1, car.__t + 0.012);
-              const eased = 1 - Math.pow(1 - car.__t, 3);
-              car.position.z = car.__startZ + (car.__targetZ - car.__startZ) * eased;
-              if (car.__t >= 1) car.__entered = true;
-            }
-          }
-          // Pulse emissive indicators
-          if (child instanceof THREE.Mesh && child.geometry instanceof THREE.SphereGeometry) {
-            const mat = child.material as THREE.MeshStandardMaterial;
-            mat.emissiveIntensity = 0.4 + 0.3 * Math.sin(t * 2.5 + child.position.x);
+          if (child instanceof THREE.Mesh && child.userData?.isOrb) {
+            const m = child.material as THREE.MeshStandardMaterial;
+            m.emissiveIntensity = 0.45 + 0.35 * Math.sin(elapsed * 2.2 + child.userData.baseX * 1.3);
           }
         });
 
         renderer.render(scene, camera);
       };
       animate();
-      stateRef.current = { renderer, animId, cleanup: () => {} };
 
-      // Resize
-      const onResize = () => {
+      // ── Resize ──
+      const ro = new ResizeObserver(() => {
         const nw = container.clientWidth, nh = container.clientHeight;
-        if (nw < 10 || nh < 10) return;
+        if (nw < 20 || nh < 20) return;
         camera.aspect = nw / nh;
         camera.updateProjectionMatrix();
         renderer.setSize(nw, nh);
-      };
-      const ro = new ResizeObserver(onResize);
+      });
       ro.observe(container);
 
-      stateRef.current.cleanup = () => {
+      return () => {
         cancelAnimationFrame(animId);
         ro.disconnect();
-        container.removeEventListener("mousedown", onMouseDown);
-        container.removeEventListener("mousedown", onPointerDown);
-        container.removeEventListener("mousemove", onMouseMove);
-        container.removeEventListener("mouseup", onMouseUp);
-        container.removeEventListener("mouseup", onPointerUp);
-        container.removeEventListener("touchstart", onTouchStart);
-        container.removeEventListener("touchmove", onTouchMove);
-        container.removeEventListener("touchend", onTouchEnd);
-        window.removeEventListener("mouseup", onMouseUp);
+        container.removeEventListener("pointerdown", onPD);
+        container.removeEventListener("pointermove", onPM);
+        container.removeEventListener("pointerup", onPU);
+        container.removeEventListener("wheel", onWheel);
+        container.removeEventListener("touchstart", onTStart);
+        container.removeEventListener("touchmove", onTMove);
+        container.removeEventListener("touchend", onTEnd);
         renderer.dispose();
         if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
       };
-
-      return true;
     };
 
-    // Try immediately, retry if container not sized yet
-    if (!tryInit()) {
+    // Init immediately or wait for dimensions
+    const cleanup = init();
+    if (cleanup) {
+      cleanupRef.current = cleanup;
+    } else {
       const ro = new ResizeObserver(() => {
-        if (tryInit()) ro.disconnect();
+        const c = init();
+        if (c) { cleanupRef.current = c; ro.disconnect(); }
       });
       ro.observe(container);
       return () => ro.disconnect();
     }
 
-    return () => {
-      stateRef.current?.cleanup();
-      stateRef.current = null;
-    };
+    return () => { cleanupRef.current?.(); cleanupRef.current = null; };
   }, [slots, onSlotClick]);
 
   return (
     <div
       ref={mountRef}
-      className="w-full h-full"
-      style={{ cursor: "grab" }}
-      title="Drag to rotate · Click green slot to book"
+      className="w-full h-full select-none"
+      style={{ cursor: "grab", touchAction: "none" }}
     />
   );
 }

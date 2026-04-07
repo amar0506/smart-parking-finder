@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, bookingsTable, parkingSlotsTable, usersTable, parkingLocationsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { CreateBookingBody, GetBookingParams, CancelBookingParams } from "@workspace/api-zod";
 import { requireAuth } from "./auth";
 
@@ -45,6 +45,16 @@ router.post("/bookings", requireAuth, async (req: any, res): Promise<void> => {
 
   const { slotId, hours, vehiclePlate } = parsed.data;
   const userId = req.user.id;
+
+  // Check for duplicate active booking on same vehicle plate
+  const allUserBookings = await db.select().from(bookingsTable).where(eq(bookingsTable.userId, userId));
+  const activeVehicleBooking = allUserBookings.find(
+    b => b.vehiclePlate === vehiclePlate && (b.status === "active")
+  );
+  if (activeVehicleBooking) {
+    res.status(400).json({ error: "Vehicle already has an active parking booking. Please cancel or complete the existing booking first." });
+    return;
+  }
 
   const [slot] = await db.select().from(parkingSlotsTable).where(eq(parkingSlotsTable.id, slotId));
   if (!slot) {

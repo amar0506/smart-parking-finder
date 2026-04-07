@@ -1,0 +1,137 @@
+Fix and upgrade the Smart Parking Finder application. 
+Keep the existing UI design but correct the following issues and improve functionality.
+
+-----------------------------------
+1️⃣ Replace Fake Location Names
+-----------------------------------
+
+Currently some parts of the UI still show old locations:
+
+• Downtown Parking Hub
+• Airport Terminal Garage
+• Mall Parking Complex
+
+Replace them everywhere in the system including:
+
+• Dashboard dropdown
+• Map view cards
+• Map markers
+• Slot grid location labels
+• Database seed data
+
+New Satna locations:
+
+1. Satna Railway Station Parking
+2. Satna Bus Stand Parking
+3. City Mall Satna Parking
+
+Also update addresses:
+
+Satna Railway Station Parking – Railway Station Road, Satna MP  
+Satna Bus Stand Parking – Bus Stand Road, Satna MP  
+City Mall Satna Parking – City Mall, Rewa Road, Satna MP  
+
+-----------------------------------
+2️⃣ Fix Slot Identification
+-----------------------------------
+
+Currently parking slots do not clearly show their slot ID.
+
+Improve slot cards so every slot clearly shows:
+
+• Slot ID (example: A-01, B-05, C-09)
+• Floor label
+• Status icon
+• Vehicle icon if booked
+
+Slot ID must be clearly visible on the top of each slot box.
+
+-----------------------------------
+3️⃣ Fix UPI Payment Verification
+-----------------------------------
+
+Current issue:
+Booking gets confirmed even without actual payment.
+
+Fix logic:
+
+• When user clicks "Pay via UPI", generate QR using UPI ID:
+  amar07@ptaxis
+
+• Booking must remain in "Pending Payment" state.
+
+• Only allow booking confirmation after payment verification.
+
+Implement simulation check:
+
+User must click "I have completed payment".
+
+System should then verify payment flag before confirming booking.
+
+Workflow:
+
+Pending Payment → Payment Verified → Booking Confirmed
+
+Do NOT confirm booking without payment.
+
+-----------------------------------
+4️⃣ Prevent Duplicate Vehicle Bookings
+-----------------------------------
+
+Currently the same vehicle number can book multiple slots.
+
+Fix this rule:
+
+• A vehicle number can have ONLY ONE active booking.
+
+If same vehicle number tries to book again:
+
+Show error message:
+
+"Vehicle already has an active parking booking."
+
+Allow new booking only if previous booking is:
+
+• Cancelled
+• Completed
+
+-----------------------------------
+5️⃣ Improve 3D Parking View
+-----------------------------------
+
+Current 3D view is basic and not visually appealing.
+
+Upgrade the 3D system using Three.js:
+
+Add:
+
+• Larger realistic parking ground
+• Clearly marked parking slots
+• Realistic 3D cars
+• Car driving animation when slot is booked
+• Lights and shadows
+• Smooth camera orbit controls
+• Zoom and rotate interaction
+• Better car models
+
+Also ensure:
+
+• 3D view loads properly
+• No blank screen
+• Mobile compatible rendering
+
+-----------------------------------
+6️⃣ General Improvements
+-----------------------------------
+
+Ensure:
+
+• No blank screens
+• No console errors
+• Database consistency
+• Mobile responsive layout
+• Smooth animations
+• Better UI feedback messages
+
+Do not remove existing features. 
+Only fix bugs and upgrade the system.
