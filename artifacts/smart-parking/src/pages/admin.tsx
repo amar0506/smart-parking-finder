@@ -302,9 +302,9 @@ export default function Admin() {
                           </TableCell>
                           <TableCell>
                             <Badge className={`text-xs ${
-                              (booking as any).paymentStatus === "paid" ? "bg-green-700" : "bg-yellow-700"
+                              (booking as any).paymentStatus === "paid" ? "bg-green-700" : "bg-orange-600"
                             }`}>
-                              {(booking as any).paymentStatus === "paid" ? "✓ Paid" : "Pending"}
+                              {(booking as any).paymentStatus === "paid" ? "✓ Paid" : "⌛ Pending Payment"}
                             </Badge>
                             {(booking as any).paymentRef && (
                               <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">{(booking as any).paymentRef}</div>

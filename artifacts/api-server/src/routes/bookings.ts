@@ -82,7 +82,7 @@ router.post("/bookings", requireAuth, async (req: any, res): Promise<void> => {
     hours,
     totalCost,
     status: "active",
-    paymentStatus: "paid",
+    paymentStatus: "pending",
     paymentRef,
   }).returning();
 

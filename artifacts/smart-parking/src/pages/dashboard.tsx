@@ -186,6 +186,9 @@ export default function Dashboard() {
                               className={`
                                 relative rounded-xl border-2 overflow-hidden h-24 md:h-28
                                 flex flex-col justify-between p-2.5 transition-all duration-150
+                                <div className="text-[10px] text-gray-400">
+                                Satna Smart Parking
+                                </div>
                                 ${isAvailable
                                   ? "border-green-500/60 bg-green-950/25 cursor-pointer hover:border-green-400 hover:bg-green-900/35 hover:shadow-lg hover:shadow-green-900/20"
                                   : isBooked
